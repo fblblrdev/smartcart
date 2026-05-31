@@ -1,0 +1,25 @@
+-- ============================================================
+-- Run AFTER creating test accounts in Supabase Auth dashboard
+-- and AFTER running schema.sql
+--
+-- Replace the UUIDs below with the actual auth user IDs
+-- from Authentication > Users in your Supabase dashboard
+-- ============================================================
+
+-- Insert reseller user profile
+-- INSERT INTO users (id, email, full_name, role)
+-- VALUES (
+--   'REPLACE_WITH_RESELLER_AUTH_USER_ID',
+--   'reseller@smartcart.com',
+--   'Demo Reseller',
+--   'RESELLER'
+-- );
+
+-- Insert customer user profile
+-- INSERT INTO users (id, email, full_name, role)
+-- VALUES (
+--   'REPLACE_WITH_CUSTOMER_AUTH_USER_ID',
+--   'customer@smartcart.com',
+--   'Demo Customer',
+--   'CUSTOMER'
+-- );
