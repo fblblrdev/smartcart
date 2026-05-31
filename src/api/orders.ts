@@ -1,6 +1,19 @@
 import { supabase } from '../lib/supabase';
 import { CheckoutFormData, GuestCartItem, Order } from '../types';
 
+async function sendOrderEmailViaEdgeFunction(order: Order, items: GuestCartItem[]) {
+  const emailItems = items.map((item) => ({
+    product_id: item.product_id,
+    quantity: item.quantity,
+    price: item.product?.price ?? 0,
+    product: { name: item.product?.name ?? item.product_id },
+  }));
+
+  await supabase.functions.invoke('send-order-email', {
+    body: { order, items: emailItems },
+  });
+}
+
 export async function fetchOrders(): Promise<Order[]> {
   const { data, error } = await supabase
     .from('orders')
@@ -45,7 +58,14 @@ export async function createOrder(
   });
 
   if (error) throw error;
-  return data as Order;
+  const order = data as Order;
+
+  // Send email via Edge Function (server-side, no CORS issues)
+  sendOrderEmailViaEdgeFunction(order, cartItems).catch((e) =>
+    console.error('Email notification failed:', e)
+  );
+
+  return order;
 }
 
 export async function updateOrderStatus(id: string, status: string) {
