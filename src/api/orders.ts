@@ -53,8 +53,8 @@ export async function createOrder(
     });
   }
 
-  // Fire email without awaiting — don't block order completion
-  sendOrderEmail(order, cartItems).catch((e) => console.error('Email notification failed:', e));
+  // Email disabled until Supabase Edge Function is set up (CORS blocks browser→Resend)
+  // sendOrderEmail(order, cartItems).catch((e) => console.error('Email notification failed:', e));
 
   return order;
 }
