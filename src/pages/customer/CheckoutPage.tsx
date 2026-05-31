@@ -1,11 +1,13 @@
 import {
   Box, Button, Card, CardContent, Container, Divider, Grid, TextField, Typography,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { createOrder } from '../../api/orders';
+import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
+import { supabase } from '../../lib/supabase';
 import { CheckoutFormData } from '../../types';
 
 const INDIAN_STATES = [
@@ -17,6 +19,7 @@ const INDIAN_STATES = [
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
+  const { appUser } = useAuth();
   const { items, total, clearCart } = useCart();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<CheckoutFormData>({
@@ -28,6 +31,28 @@ export default function CheckoutPage() {
     state: '',
     pincode: '',
   });
+
+  // Pre-fill from user profile
+  useEffect(() => {
+    if (!appUser) return;
+    supabase
+      .from('users')
+      .select('full_name, email, phone, address, city, state, pincode')
+      .eq('id', appUser.id)
+      .single()
+      .then(({ data }) => {
+        if (!data) return;
+        setForm({
+          customer_name: data.full_name ?? '',
+          customer_email: data.email ?? '',
+          customer_phone: data.phone ?? '',
+          address: data.address ?? '',
+          city: data.city ?? '',
+          state: data.state ?? '',
+          pincode: data.pincode ?? '',
+        });
+      });
+  }, [appUser]);
 
   if (items.length === 0) {
     navigate('/cart');
@@ -45,6 +70,18 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const order = await createOrder(form, items);
+
+      // Save address back to profile for next time
+      if (appUser) {
+        await supabase.from('users').update({
+          phone: form.customer_phone,
+          address: form.address,
+          city: form.city,
+          state: form.state,
+          pincode: form.pincode,
+        }).eq('id', appUser.id);
+      }
+
       await clearCart();
       navigate('/order-success', { state: { order } });
     } catch (err: any) {
@@ -62,16 +99,36 @@ export default function CheckoutPage() {
           <Card>
             <CardContent sx={{ p: 3 }}>
               <Typography variant="h6" fontWeight={700} mb={3}>Shipping Information</Typography>
+              {appUser && (
+                <Typography variant="body2" color="text.secondary" mb={2}>
+                  Your details are pre-filled. Update your address below if needed.
+                </Typography>
+              )}
               <form onSubmit={handlePlaceOrder} id="checkout-form">
                 <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Full Name" fullWidth required
+                      value={form.customer_name} onChange={setField('customer_name')}
+                      InputProps={{ readOnly: !!appUser }}
+                      sx={{ '& .MuiInputBase-root': { bgcolor: appUser ? 'grey.50' : 'inherit' } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Email" type="email" fullWidth required
+                      value={form.customer_email} onChange={setField('customer_email')}
+                      InputProps={{ readOnly: !!appUser }}
+                      sx={{ '& .MuiInputBase-root': { bgcolor: appUser ? 'grey.50' : 'inherit' } }}
+                    />
+                  </Grid>
                   <Grid item xs={12}>
-                    <TextField label="Full Name" fullWidth required value={form.customer_name} onChange={setField('customer_name')} />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField label="Email" type="email" fullWidth required value={form.customer_email} onChange={setField('customer_email')} />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField label="Phone Number" fullWidth required value={form.customer_phone} onChange={setField('customer_phone')} inputProps={{ maxLength: 10 }} />
+                    <TextField
+                      label="Phone Number" fullWidth required
+                      value={form.customer_phone} onChange={setField('customer_phone')}
+                      inputProps={{ maxLength: 10 }}
+                      helperText="10-digit mobile number"
+                    />
                   </Grid>
                   <Grid item xs={12}>
                     <TextField label="Address" fullWidth required multiline rows={2} value={form.address} onChange={setField('address')} />
@@ -81,12 +138,8 @@ export default function CheckoutPage() {
                   </Grid>
                   <Grid item xs={12} sm={4}>
                     <TextField
-                      label="State"
-                      fullWidth
-                      required
-                      select
-                      value={form.state}
-                      onChange={setField('state')}
+                      label="State" fullWidth required select
+                      value={form.state} onChange={setField('state')}
                       SelectProps={{ native: true }}
                     >
                       <option value=""></option>
