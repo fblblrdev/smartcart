@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase';
 import { CheckoutFormData, GuestCartItem, Order } from '../types';
-import { sendOrderEmail } from './email';
 
 export async function fetchOrders(): Promise<Order[]> {
   const { data, error } = await supabase
@@ -27,36 +26,26 @@ export async function createOrder(
 ): Promise<Order> {
   const total = cartItems.reduce((sum, item) => sum + (item.product?.price ?? 0) * item.quantity, 0);
 
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({ ...formData, total_amount: total, status: 'pending' })
-    .select()
-    .single();
-
-  if (orderError) throw orderError;
-
-  const orderItems = cartItems.map((item) => ({
-    order_id: order.id,
+  const items = cartItems.map((item) => ({
     product_id: item.product_id,
     quantity: item.quantity,
     price: item.product?.price ?? 0,
   }));
 
-  const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-  if (itemsError) throw itemsError;
+  const { data, error } = await supabase.rpc('place_order', {
+    p_customer_name: formData.customer_name,
+    p_customer_email: formData.customer_email,
+    p_customer_phone: formData.customer_phone,
+    p_address: formData.address,
+    p_city: formData.city,
+    p_state: formData.state,
+    p_pincode: formData.pincode,
+    p_total_amount: total,
+    p_items: items,
+  });
 
-  // Reduce inventory
-  for (const item of cartItems) {
-    await supabase.rpc('decrement_product_quantity', {
-      p_id: item.product_id,
-      p_quantity: item.quantity,
-    });
-  }
-
-  // Email disabled until Supabase Edge Function is set up (CORS blocks browser→Resend)
-  // sendOrderEmail(order, cartItems).catch((e) => console.error('Email notification failed:', e));
-
-  return order;
+  if (error) throw error;
+  return data as Order;
 }
 
 export async function updateOrderStatus(id: string, status: string) {
