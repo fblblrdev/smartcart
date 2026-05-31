@@ -53,12 +53,8 @@ export async function createOrder(
     });
   }
 
-  // Send email notification
-  try {
-    await sendOrderEmail(order, cartItems);
-  } catch (e) {
-    console.error('Email notification failed:', e);
-  }
+  // Fire email without awaiting — don't block order completion
+  sendOrderEmail(order, cartItems).catch((e) => console.error('Email notification failed:', e));
 
   return order;
 }
